@@ -1,3 +1,11 @@
+---
+Title: Execute a command on the host
+Description: It may be needed to execute commands back on the host.
+PublicationDate: 2023-01-11
+Authors:
+    - 89luca89
+---
+
 - [Distrobox](../README.md)
   - [Execute a command on the host](#execute-a-command-on-the-host)
     - [With distrobox-host-exec](#with-distrobox-host-exec)
