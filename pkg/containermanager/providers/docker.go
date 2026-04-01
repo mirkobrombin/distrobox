@@ -19,9 +19,11 @@ import (
 	"github.com/89luca89/distrobox/internal/userenv"
 	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
+	"github.com/mirkobrombin/go-foundation/pkg/contracts"
 )
 
 type Docker struct {
+	contracts.Implements[containermanager.ContainerManager]
 	root        bool
 	sudoCommand string
 	verbose     bool
