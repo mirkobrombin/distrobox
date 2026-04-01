@@ -15,9 +15,3 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace (
-	github.com/mirkobrombin/go-cli-builder/v2 => /var/home/mirko/Projects/personal/go-tools/go-cli-builder
-	github.com/mirkobrombin/go-conf-builder/v2 => /var/home/mirko/Projects/personal/go-tools/go-conf-builder
-	github.com/mirkobrombin/go-foundation => /var/home/mirko/Projects/personal/go-tools/go-foundation
-)
