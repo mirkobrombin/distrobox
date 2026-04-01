@@ -10,6 +10,7 @@ import (
 
 	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/containermanager/providers"
+	"github.com/mirkobrombin/go-foundation/pkg/adapters"
 )
 
 type contextKey string
@@ -63,6 +64,14 @@ func NewRootCommand() *cli.Command {
 	}
 }
 
+func buildContainerManagerRegistry(root bool, sudoCommand string, verbose bool) *adapters.Registry[containermanager.ContainerManager] {
+	registry := adapters.NewRegistry[containermanager.ContainerManager]()
+	registry.Register("docker", providers.NewDocker(root, sudoCommand, verbose))
+	registry.Register("podman", providers.NewPodman(root, sudoCommand, verbose))
+	registry.SetDefault("podman")
+	return registry
+}
+
 func beforeAction(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 	root := cmd.Bool("root")
 	if root {
@@ -74,14 +83,17 @@ func beforeAction(ctx context.Context, cmd *cli.Command) (context.Context, error
 	containerManagerType := cmd.String("container-manager")
 	verbose := cmd.Bool("verbose")
 
+	registry := buildContainerManagerRegistry(root, sudoCommand, verbose)
+
 	var containerManager containermanager.ContainerManager
-	switch containerManagerType {
-	case "docker":
-		containerManager = providers.NewDocker(root, sudoCommand, verbose)
-	case "podman", "podman-static", "":
-		containerManager = providers.NewPodman(root, sudoCommand, verbose)
-	default:
-		return nil, fmt.Errorf("unsupported container manager: %s", containerManagerType)
+	if containerManagerType != "" && containerManagerType != "podman-static" {
+		var ok bool
+		containerManager, ok = registry.Get(containerManagerType)
+		if !ok {
+			return nil, fmt.Errorf("unsupported container manager: %s", containerManagerType)
+		}
+	} else {
+		containerManager = registry.Default()
 	}
 
 	return context.WithValue(ctx, contextKey("containerManager"), containerManager), nil
