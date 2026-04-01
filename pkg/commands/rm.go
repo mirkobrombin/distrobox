@@ -12,6 +12,7 @@ import (
 	"github.com/89luca89/distrobox/internal/userenv"
 	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
+	fnerrors "github.com/mirkobrombin/go-foundation/pkg/errors"
 )
 
 type RmResult struct {
@@ -63,16 +64,16 @@ func (c *RmCommand) Execute(ctx context.Context, options RmOptions) (*RmResult, 
 	userHome := userEnv.Home
 
 	var removedDistroboxes []containermanager.Container
+	errs := &fnerrors.MultiError{}
 	for _, currentDistrobox := range distroboxesToRemove {
 		err := c.removeContainer(ctx, currentDistrobox, options.Force, options.NoTTY, userHome)
 		if err != nil {
-			//nolint:forbidigo // waiting for the logger implementation
-			fmt.Printf("error deleting %s: %s", currentDistrobox.Name, err)
+			errs.Append(fmt.Errorf("error deleting %s: %w", currentDistrobox.Name, err))
 		}
 		removedDistroboxes = append(removedDistroboxes, currentDistrobox)
 	}
 
-	return &RmResult{Containers: removedDistroboxes}, nil
+	return &RmResult{Containers: removedDistroboxes}, errs.ErrorOrNil()
 }
 
 func (c *RmCommand) removeContainer(
