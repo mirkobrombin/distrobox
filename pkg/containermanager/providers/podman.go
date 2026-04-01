@@ -18,6 +18,7 @@ import (
 	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
 	"github.com/mirkobrombin/go-foundation/pkg/contracts"
+	"github.com/mirkobrombin/go-foundation/pkg/resiliency"
 )
 
 type Podman struct {
@@ -468,7 +469,9 @@ func (p *Podman) run(ctx context.Context, args []string, opts runOptions) (strin
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err := resiliency.Retry(ctx, func() error {
+		return cmd.Run()
+	}, resiliency.WithAttempts(3), resiliency.WithDelay(200*time.Millisecond, 2*time.Second))
 	if err != nil {
 		captured := strings.TrimSpace(stderr.String())
 		if captured != "" {
