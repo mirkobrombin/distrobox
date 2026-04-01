@@ -2,8 +2,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/mirkobrombin/go-cli-builder/v2 v2.0.5 h1:ASWEhdH5sPUVVQ9OC/1uuDLPvglBqy8JMcw0YojvSIo=
 github.com/mirkobrombin/go-cli-builder/v2 v2.0.5/go.mod h1:jqg09VyejIcNMrGSz4zflb1VO1dOZ6h4hKfmGkXv110=
-github.com/mirkobrombin/go-conf-builder/v2 v2.0.1 h1:yXUmLGO+h8l8J7frlaBkyGBpnjsQKdjwL6dJxZ0/hnw=
-github.com/mirkobrombin/go-conf-builder/v2 v2.0.1/go.mod h1:/ewJbCr6YKmDzqLO7zkio84TdPVN9zIRaRiLRhdSteA=
 github.com/mirkobrombin/go-foundation v0.4.0 h1:/OHdEfdpHVN8on+t0jZRjJ0N5V1ZE4mwNN4z0rAT6lI=
 github.com/mirkobrombin/go-foundation v0.4.0/go.mod h1:ScQBotKzuC5Lxi61Wyw0h8NaeGKsuwp4xHwPj5Mj9DY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
