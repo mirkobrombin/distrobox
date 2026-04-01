@@ -1,15 +1,15 @@
 package config
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/joho/godotenv"
+	"github.com/89luca89/distrobox/internal/config/envfile"
 )
 
-// LoadConfig loads configuration files in order, with later files taking priority.
+// LoadConfig loads configuration files in order, with higher-priority files first.
 // Environment variables are NOT overwritten by config files.
 func LoadConfig() error {
 	configFilePaths, err := getConfigFilePaths()
@@ -17,9 +17,22 @@ func LoadConfig() error {
 		return fmt.Errorf("failed to get config file paths: %w", err)
 	}
 
-	if err := godotenv.Load(configFilePaths...); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("failed to load config: %w", err)
+	ctx := context.Background()
+	for _, path := range configFilePaths {
+		provider := envfile.New(path)
+		values, err := provider.Load(ctx)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("failed to load config file %s: %w", path, err)
+		}
+		for k, v := range values {
+			if os.Getenv(k) == "" {
+				if err := os.Setenv(k, fmt.Sprintf("%v", v)); err != nil {
+					return fmt.Errorf("failed to set env var %s: %w", k, err)
+				}
+			}
 		}
 	}
 
@@ -38,7 +51,6 @@ func GetDesktopEntryDir() string {
 
 // GetDistroboxPath returns the path to the current distrobox executable
 func GetDistroboxPath() (string, error) {
-	// The current executable is used as distrobox path
 	distroboxPath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to get distrobox executable path: %w", err)
