@@ -1,67 +1,58 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/urfave/cli/v3"
+	gocli "github.com/mirkobrombin/go-cli-builder/v2/pkg/cli"
 
 	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/containermanager/providers"
 	"github.com/mirkobrombin/go-foundation/pkg/adapters"
 )
 
-type contextKey string
+// Root is the root CLI struct.
+type Root struct {
+	ContainerManager string `cli:"container-manager" env:"DBX_CONTAINER_MANAGER" default:""`
+	SudoCommand      string `cli:"sudo-command" env:"DBX_SUDO_COMMAND" default:"sudo"`
+	Root             bool   `cli:"root,r"`
+	Verbose          bool   `cli:"verbose,v" env:"DBX_VERBOSE"`
 
-const containerManagerKey contextKey = "containerManager"
+	List          ListCmd          `cmd:"list" help:"List distroboxes" aliases:"ls"`
+	GenerateEntry GenerateEntryCmd `cmd:"generate-entry" help:"Generate or delete distrobox entries"`
+	Create        CreateCmd        `cmd:"create" help:"Create a new distrobox container"`
+	Enter         EnterCmd         `cmd:"enter" help:"Enter a distrobox"`
+	Assemble      AssembleCmd      `cmd:"assemble" help:"Create or remove distroboxes from a manifest file"`
+	Rm            RmCmd            `cmd:"rm" help:"Remove distroboxes"`
+	Stop          StopCmd          `cmd:"stop" help:"Stop running distrobox containers"`
+	Ephemeral     EphemeralCmd     `cmd:"ephemeral" help:"Create a temporary distrobox that is removed on exit"`
+	Upgrade       UpgradeCmd       `cmd:"upgrade" help:"Upgrade packages inside distrobox containers"`
 
-func NewRootCommand() *cli.Command {
-	return &cli.Command{
-		Name:    "distrobox",
-		Version: "1.0.0",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "container-manager",
-				Usage:   "",
-				Sources: cli.EnvVars("DBX_CONTAINER_MANAGER", "container_manager"),
-				Hidden:  true,
-			},
-			&cli.StringFlag{
-				Name:    "sudo-command",
-				Usage:   "",
-				Sources: cli.EnvVars("DBX_SUDO_COMMAND", "sudo_command"),
-				Hidden:  true,
-				Value:   "sudo",
-			},
-			&cli.BoolFlag{
-				Name: "root",
-				Usage: "launch podman/docker/lilipod with root privileges. Note that if you need root this is the preferred\n" +
-					"way over \"sudo distrobox\" (note: if using a program other than 'sudo' for root privileges is necessary,\n" +
-					"specify it through the DBX_SUDO_PROGRAM env variable, or 'distrobox_sudo_program' config variable)",
-				Aliases: []string{"r"},
-			},
-			&cli.BoolFlag{
-				Name:    "verbose",
-				Aliases: []string{"v"},
-				Usage:   "show more verbosity",
-				Sources: cli.EnvVars("DBX_VERBOSE", "verbose"),
-			},
-		},
-		Before: beforeAction,
-		Commands: []*cli.Command{
-			newListCommand(),
-			newGenerateEntryCommand(),
-			newCreateCommand(),
-			newEnterCommand(),
-			newAssembleCommand(),
-			newRmCommand(),
-			newStopCommand(),
-			newEphemeralCommand(),
-			newUpgradeCommand(),
-		},
+	gocli.Base
+}
+
+func (r *Root) Before() error {
+	if r.Root {
+		if err := validateSudo(); err != nil {
+			return fmt.Errorf("cannot run in root mode: %w", err)
+		}
 	}
+
+	registry := buildContainerManagerRegistry(r.Root, r.SudoCommand, r.Verbose)
+
+	cmType := r.ContainerManager
+	if cmType != "" && cmType != "podman-static" {
+		cm, ok := registry.Get(cmType)
+		if !ok {
+			return fmt.Errorf("unsupported container manager: %s", cmType)
+		}
+		containerManager = cm
+	} else {
+		containerManager = registry.Default()
+	}
+
+	return nil
 }
 
 func buildContainerManagerRegistry(root bool, sudoCommand string, verbose bool) *adapters.Registry[containermanager.ContainerManager] {
@@ -72,35 +63,15 @@ func buildContainerManagerRegistry(root bool, sudoCommand string, verbose bool) 
 	return registry
 }
 
-func beforeAction(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-	root := cmd.Bool("root")
-	if root {
-		if err := validateSudo(ctx); err != nil {
-			return nil, fmt.Errorf("cannot run in root mode: %w", err)
-		}
-	}
-	sudoCommand := cmd.String("sudo-command")
-	containerManagerType := cmd.String("container-manager")
-	verbose := cmd.Bool("verbose")
-
-	registry := buildContainerManagerRegistry(root, sudoCommand, verbose)
-
-	var containerManager containermanager.ContainerManager
-	if containerManagerType != "" && containerManagerType != "podman-static" {
-		var ok bool
-		containerManager, ok = registry.Get(containerManagerType)
-		if !ok {
-			return nil, fmt.Errorf("unsupported container manager: %s", containerManagerType)
-		}
-	} else {
-		containerManager = registry.Default()
-	}
-
-	return context.WithValue(ctx, contextKey("containerManager"), containerManager), nil
+// NewRootCommand returns the go-cli-builder App for main.go compatibility.
+func NewRootCommand() *gocli.App {
+	app, _ := gocli.New(&Root{})
+	app.SetName("distrobox")
+	return app
 }
 
-func validateSudo(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "sudo", "-v")
+func validateSudo() error {
+	cmd := exec.Command("sudo", "-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

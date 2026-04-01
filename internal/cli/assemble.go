@@ -3,109 +3,64 @@ package cli
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	gocli "github.com/mirkobrombin/go-cli-builder/v2/pkg/cli"
 
 	"github.com/89luca89/distrobox/pkg/commands"
-	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/manifest"
 	"github.com/89luca89/distrobox/pkg/ui"
 )
 
-func newAssembleCommand() *cli.Command {
-	fileFlag := &cli.StringFlag{Name: "file", Usage: "path or URL to the distrobox manifest/ini file"}
-	nameFlag := &cli.StringFlag{
-		Name:    "name",
-		Aliases: []string{"n"},
-		Usage:   "run against a single entry in the manifest/ini file",
-	}
-	dryRunFlag := &cli.BoolFlag{
-		Name:    "dry-run",
-		Aliases: []string{"d"},
-		Usage:   "only print the container manager command generated",
-	}
-
-	return &cli.Command{
-		Name: "assemble",
-		UsageText: `
-	distrobox assemble create
-	distrobox assemble rm
-	distrobox assemble create --file /path/to/file.ini
-	distrobox assemble rm --file /path/to/file.ini
-	distrobox assemble create --replace --file /path/to/file.ini
-
-Options:
-
-	--file:			path or URL to the distrobox manifest/ini file
-	--name/-n:		run against a single entry in the manifest/ini file
-	--replace/-R:		replace already existing distroboxes with matching names
-	--dry-run/-d:		only print the container manager command generated
-	--verbose/-v:		show more verbosity
-	--version/-V:		show version
-`,
-		Commands: []*cli.Command{
-			{
-				Name: "create",
-				Flags: []cli.Flag{
-					fileFlag,
-					nameFlag,
-					&cli.BoolFlag{
-						Name:    "replace",
-						Aliases: []string{"R"},
-						Usage:   "replace already existing distroboxes with matching names",
-					},
-					dryRunFlag,
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return assembleAction(ctx, cmd, false)
-				},
-			},
-			{
-				Name: "rm",
-				Flags: []cli.Flag{
-					fileFlag,
-					nameFlag,
-					dryRunFlag,
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return assembleAction(ctx, cmd, true)
-				},
-			},
-		},
-	}
+type AssembleCmd struct {
+	Create AssembleCreateCmd `cmd:"create" help:"Create distroboxes from manifest"`
+	Rm     AssembleRmCmd     `cmd:"rm" help:"Remove distroboxes from manifest"`
+	gocli.Base
 }
 
-func assembleAction(ctx context.Context, cmd *cli.Command, deleteFlag bool) error {
-	containerManager, ok := ctx.Value(containerManagerKey).(containermanager.ContainerManager)
-	if !ok {
-		return errors.New("container manager not found in context")
+type AssembleCreateCmd struct {
+	File    string `cli:"file" help:"path to manifest file" default:"./distrobox.ini"`
+	Name    string `cli:"name,n" help:"run against a single entry"`
+	Replace bool   `cli:"replace,R" help:"replace existing distroboxes"`
+	DryRun  bool   `cli:"dry-run,d" help:"only print the container manager command generated"`
+	gocli.Base
+}
+
+func (c *AssembleCreateCmd) Run() error {
+	return assembleRun(c.Ctx, c.File, c.Name, c.DryRun, false, c.Replace)
+}
+
+type AssembleRmCmd struct {
+	File   string `cli:"file" help:"path to manifest file" default:"./distrobox.ini"`
+	Name   string `cli:"name,n" help:"run against a single entry"`
+	DryRun bool   `cli:"dry-run,d" help:"only print the container manager command generated"`
+	gocli.Base
+}
+
+func (c *AssembleRmCmd) Run() error {
+	return assembleRun(c.Ctx, c.File, c.Name, c.DryRun, true, false)
+}
+
+func assembleRun(ctx context.Context, filePath, name string, dryRun, doDelete, replace bool) error {
+	if filePath == "" {
+		filePath = "./distrobox.ini"
 	}
 
-	// TODO: handle file name as a positional argument
-	// https://github.com/89luca89/distrobox-next/blob/07b3abf2015effafc5596b9dc7f02c35a17eb8a7/distrobox-assemble#L205
-
-	manifestFilePath := cmd.String("file")
-	if manifestFilePath == "" {
-		manifestFilePath = "./distrobox.ini"
-	}
-
-	manifest, err := manifest.Parse(ctx, manifestFilePath)
+	parsed, err := manifest.Parse(ctx, filePath)
 	if err != nil {
 		return fmt.Errorf("failed to parse manifest file: %w", err)
 	}
 
 	opts := commands.AssembleOptions{
-		Items:   manifest,
-		Boxname: cmd.String("name"),
-		DryRun:  cmd.Bool("dry-run"),
+		Items:   parsed,
+		Boxname: name,
+		DryRun:  dryRun,
 	}
-	if deleteFlag {
+	if doDelete {
 		opts.Delete = true
 	} else {
-		opts.Replace = cmd.Bool("replace")
+		opts.Replace = replace
 	}
 
 	prompter := ui.NewPrompter(*bufio.NewReader(os.Stdin), os.Stdout)
@@ -113,7 +68,6 @@ func assembleAction(ctx context.Context, cmd *cli.Command, deleteFlag bool) erro
 	printer := ui.NewPrinter(os.Stdout, true)
 
 	assembleCmd := commands.NewAssembleCommand(containerManager, prompter, progress, printer)
-
 	err = assembleCmd.Execute(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to execute assemble command: %w", err)

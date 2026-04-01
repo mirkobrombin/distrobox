@@ -1,102 +1,55 @@
 package cli
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v3"
+	gocli "github.com/mirkobrombin/go-cli-builder/v2/pkg/cli"
 
 	"github.com/89luca89/distrobox/pkg/commands"
-	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
 )
 
-func newEnterCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "enter",
-		Usage: "Enter a distrobox",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "name",
-				Aliases: []string{"n"},
-				Usage:   "name for the distrobox",
-			},
-			&cli.BoolFlag{
-				Name:    "dry-run",
-				Aliases: []string{"d"},
-				Usage:   "only print the container manager command generated",
-			},
-			&cli.BoolFlag{
-				Name:    "clean-path",
-				Aliases: []string{"c"},
-				Usage:   "only print the container manager command generated",
-			},
-			&cli.StringFlag{
-				Name:    "additional-flags",
-				Aliases: []string{"a"},
-				Usage:   "additional flags to pass to the container manager command",
-			},
-			&cli.BoolFlag{
-				Name:    "yes",
-				Aliases: []string{"y"},
-				Usage:   "only print the container manager command generated",
-			},
-			&cli.BoolFlag{
-				Name:    "no-tty",
-				Aliases: []string{"T", "H"},
-				Usage:   "show more verbosity",
-			},
-			&cli.BoolFlag{
-				Name:    "no-workdir",
-				Aliases: []string{"nw"},
-				Usage:   "always start the container from container's home directory",
-			},
-		},
-		UseShortOptionHandling: true,
-		SkipFlagParsing:        false,
-		Action:                 enterAction,
-	}
+type EnterCmd struct {
+	Name            string   `cli:"name,n" help:"name for the distrobox"`
+	DryRun          bool     `cli:"dry-run,d" help:"only print the container manager command generated"`
+	CleanPath       bool     `cli:"clean-path,c" help:"use a clean PATH inside the container"`
+	AdditionalFlags string   `cli:"additional-flags,a" help:"additional flags to pass to the container manager command"`
+	NoTTY           bool     `cli:"no-tty,T" help:"disable TTY allocation"`
+	NoWorkDir       bool     `cli:"no-workdir,nw" help:"always start the container from container home directory"`
+	Args            []string `arg:"" help:"[container-name] [-- command...]"`
+	gocli.Base
 }
 
-func enterAction(ctx context.Context, cmd *cli.Command) error {
-	containerManager, ok := ctx.Value(containerManagerKey).(containermanager.ContainerManager)
-	if !ok {
-		return errors.New("container manager not found in context")
-	}
+func (c *EnterCmd) Run() error {
+	containerName := c.Name
+	args := c.Args
 
-	// Container name: --name flag takes priority, otherwise first positional arg.
-	// Everything after the container name (or after --) is the custom command.
-	containerName := cmd.String("name")
-	var customCommand string
-
-	args := cmd.Args().Slice()
 	if containerName == "" && len(args) > 0 {
 		containerName = args[0]
 		args = args[1:]
 	}
 
+	var customCommand string
 	if len(args) > 0 {
 		customCommand = strings.Join(args, " ")
 	}
 
 	options := commands.EnterOptions{
 		ContainerName:   containerName,
-		AdditionalFlags: cmd.String("additional-flags"),
+		AdditionalFlags: c.AdditionalFlags,
 		CustomCommand:   customCommand,
-		DryRun:          cmd.Bool("dry-run"),
-		NoTTY:           cmd.Bool("no-tty"),
-		CleanPath:       cmd.Bool("clean-path"),
-		Verbose:         cmd.Bool("verbose"),
+		DryRun:          c.DryRun,
+		NoTTY:           c.NoTTY,
+		CleanPath:       c.CleanPath,
 	}
 
 	progress := ui.NewProgress(os.Stderr)
 	printer := ui.NewPrinter(os.Stderr, true)
 
 	enterCmd := commands.NewEnterCommand(containerManager, progress, printer)
-	_, err := enterCmd.Execute(ctx, options)
+	_, err := enterCmd.Execute(c.Ctx, options)
 	if err != nil {
 		return fmt.Errorf("failed to execute enter command: %w", err)
 	}

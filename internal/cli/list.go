@@ -1,46 +1,28 @@
 package cli
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	gocli "github.com/mirkobrombin/go-cli-builder/v2/pkg/cli"
 
 	"github.com/89luca89/distrobox/pkg/commands"
-	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
 )
 
-func newListCommand() *cli.Command {
-	return &cli.Command{
-		Name:    "list",
-		Aliases: []string{"ls"},
-		Usage:   "List distroboxes",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "no-color",
-				Usage: "Disable color output",
-			},
-		},
-		Action: listAction,
-	}
+type ListCmd struct {
+	NoColor bool `cli:"no-color" help:"Disable color output"`
+	gocli.Base
 }
 
-func listAction(ctx context.Context, cmd *cli.Command) error {
-	containerManager, ok := ctx.Value(containerManagerKey).(containermanager.ContainerManager)
-	if !ok {
-		return errors.New("container manager not found in context")
-	}
-
+func (c *ListCmd) Run() error {
 	listCmd := commands.NewListCommand(containerManager)
-	result, err := listCmd.Execute(ctx)
+	result, err := listCmd.Execute(c.Ctx)
 	if err != nil {
 		return fmt.Errorf("failed to execute list command: %w", err)
 	}
 
-	noColor := cmd.Bool("no-color") || !isTerminal()
+	noColor := c.NoColor || !isTerminal()
 	printResult(result, noColor)
 
 	return nil
@@ -52,19 +34,19 @@ func printResult(result *commands.ListResult, noColor bool) {
 	//nolint:forbidigo // Using fmt.Printf is acceptable here for CLI output
 	fmt.Printf(rowFormat, "ID", "NAME", "STATUS", "IMAGE")
 
-	for _, c := range result.Containers {
+	for _, cont := range result.Containers {
 		var line string
 		switch {
 		case noColor:
 			line = rowFormat
-		case c.IsRunning():
+		case cont.IsRunning():
 			line = ui.Green(rowFormat)
 		default:
 			line = ui.Yellow(rowFormat)
 		}
 
 		//nolint:forbidigo // Using fmt.Printf is acceptable here for CLI output
-		fmt.Printf(line, c.ID, c.Name, c.Status, c.Image)
+		fmt.Printf(line, cont.ID, cont.Name, cont.Status, cont.Image)
 	}
 }
 

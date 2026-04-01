@@ -2,59 +2,28 @@ package cli
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	gocli "github.com/mirkobrombin/go-cli-builder/v2/pkg/cli"
 
 	"github.com/89luca89/distrobox/pkg/commands"
-	"github.com/89luca89/distrobox/pkg/containermanager"
 	"github.com/89luca89/distrobox/pkg/ui"
 )
 
-func newStopCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "stop",
-		Usage: "stop running distrobox containers",
-		UsageText: `distrobox stop [options] [container-name...]
-
-Examples:
-    distrobox stop container-name
-    distrobox stop container1 container2
-    distrobox stop --all
-    distrobox stop --yes container-name`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "all",
-				Aliases: []string{"a"},
-				Usage:   "stop all distroboxes",
-			},
-			&cli.BoolFlag{
-				Name:    "yes",
-				Aliases: []string{"Y"},
-				Usage:   "non-interactive, stop without asking",
-			},
-		},
-		Action: stopAction,
-	}
+type StopCmd struct {
+	All            bool     `cli:"all,a" help:"stop all distroboxes"`
+	Yes            bool     `cli:"yes,Y" help:"non-interactive, stop without asking"`
+	ContainerNames []string `arg:"" help:"container names to stop"`
+	gocli.Base
 }
 
-func stopAction(ctx context.Context, cmd *cli.Command) error {
-	containerManager, ok := ctx.Value(containerManagerKey).(containermanager.ContainerManager)
-	if !ok {
-		return errors.New("container manager not found in context")
-	}
-
-	all := cmd.Bool("all")
-	nonInteractive := cmd.Bool("yes")
-	containerNames := cmd.Args().Slice()
-
+func (c *StopCmd) Run() error {
 	options := &commands.StopOptions{
-		ContainerNames: containerNames,
-		NonInteractive: nonInteractive,
-		All:            all,
+		ContainerNames: c.ContainerNames,
+		NonInteractive: c.Yes,
+		All:            c.All,
 	}
 
 	printer := ui.NewPrinter(os.Stdout, true)
@@ -62,8 +31,7 @@ func stopAction(ctx context.Context, cmd *cli.Command) error {
 	prompter := ui.NewPrompter(*bufio.NewReader(os.Stdin), os.Stdout)
 
 	stopCmd := commands.NewStopCommand(containerManager, prompter)
-
-	err := stopCmd.Execute(ctx, options)
+	err := stopCmd.Execute(c.Ctx, options)
 
 	if errors.Is(err, commands.ErrStopAbortedByUserError) {
 		printer.Println("Aborted.")

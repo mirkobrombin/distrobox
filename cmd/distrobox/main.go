@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"log"
-	"os"
 
 	"github.com/89luca89/distrobox/internal/cli"
 	"github.com/89luca89/distrobox/internal/config"
@@ -15,7 +13,7 @@ func main() {
 	}
 
 	cmd := cli.NewRootCommand()
-	if err := cmd.Run(context.Background(), os.Args); err != nil {
+	if err := cmd.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
